@@ -18,7 +18,8 @@ const cancelBtn = document.getElementById("cancel-btn");
 const formTitle = document.getElementById("form-title");
 
 // API base URL
-const API_BASE = "/api/cocktails";
+const API_BASE =  "https://franky-app-ix96j.ondigitalocean.app/api/bevvies";
+
 
 // Initialize the application
 document.addEventListener("DOMContentLoaded", function () {
