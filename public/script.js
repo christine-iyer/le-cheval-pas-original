@@ -268,8 +268,9 @@ window.collapseCard = function (event, id) {
   displayCocktails(cocktails);
   event.stopPropagation();
 };
+// ...existing code...
 
-// Image upload logic
+// Image upload logic - Updated for Cloudinary
 const fileInput = document.getElementById("theJpegFile");
 const imageUrlInput = document.getElementById("theJpeg");
 const imagePreview = document.getElementById("image-upload-preview");
@@ -279,36 +280,76 @@ if (fileInput) {
   fileInput.addEventListener("change", async function (e) {
     const file = fileInput.files[0];
     if (!file) return;
-    imagePreview.innerHTML = "";
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      imagePreview.innerHTML = '<div style="color:red;">Please select a valid image file (JPEG, PNG, GIF, or WebP)</div>';
+      return;
+    }
+    
+    // Validate file size (10MB Cloudinary limit)
+    if (file.size > 10 * 1024 * 1024) {
+      imagePreview.innerHTML = '<div style="color:red;">File size must be less than 10MB</div>';
+      return;
+    }
+    
+    imagePreview.innerHTML = '<div style="color:blue;">Uploading to Cloudinary...</div>';
     uploadedImagePath = null;
+    
     // Show preview
     const reader = new FileReader();
     reader.onload = function (ev) {
       imagePreview.innerHTML = `<img src="${ev.target.result}" alt="Preview" style="max-width:120px;max-height:80px;border-radius:8px;box-shadow:0 2px 8px #ccc;">`;
     };
     reader.readAsDataURL(file);
-    // Upload file
+    
+    // Upload to Cloudinary
     const formData = new FormData();
-    formData.append("image", file);
+    formData.append("file", file);
+    formData.append("upload_preset", "cocktail"); // Replace with your preset
+    formData.append("cloud_name", "dqjhgnivi"); // Replace with your cloud name
+    
     try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (res.ok && data.filePath) {
-        uploadedImagePath = data.filePath;
-        // Optionally show a checkmark or success message
+      const response = await fetch(
+        "https://api.cloudinary.com/v1_1/dqjhgnivi/image/upload", // Replace with your cloud name
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (response.ok && data.secure_url) {
+        uploadedImagePath = data.secure_url;
+        imagePreview.innerHTML += '<div style="color:green;font-size:12px;">✓ Upload successful</div>';
       } else {
-        imagePreview.innerHTML += `<div style='color:red;'>Upload failed: ${
-          data.error || "Unknown error"
-        }</div>`;
+        imagePreview.innerHTML = `<div style='color:red;'>Upload failed: ${data.error?.message || "Unknown error"}</div>`;
       }
     } catch (err) {
-      imagePreview.innerHTML += `<div style='color:red;'>Upload failed</div>`;
+      console.error('Upload error:', err);
+      imagePreview.innerHTML = '<div style="color:red;">Upload failed. Please try again.</div>';
     }
   });
 }
+
+// Updated form reset to clear image preview
+function resetForm() {
+  cocktailForm.reset();
+  editingId = null;
+  uploadedImagePath = null;
+  formTitle.textContent = "Add New Cocktail";
+  cancelBtn.style.display = "none";
+  document.getElementById("cocktail-id").value = "";
+  
+  // Clear image preview
+  if (imagePreview) {
+    imagePreview.innerHTML = "";
+  }
+}
+
+// ...existing code...
 
 // Handle form submission
 async function handleFormSubmit(e) {
