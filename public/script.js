@@ -18,52 +18,142 @@ const cancelBtn = document.getElementById("cancel-btn");
 const formTitle = document.getElementById("form-title");
 
 // API base URL
-const API_BASE =  "https://franky-app-ix96j.ondigitalocean.app/api/bevvies";
+const API_BASE = "https://franky-app-ix96j.ondigitalocean.app/api/bevvies";
 
+// Image upload variables
+const fileInput = document.getElementById("theJpegFile");
+const imageUrlInput = document.getElementById("theJpeg");
+const imagePreview = document.getElementById("image-upload-preview");
+let uploadedImagePath = null;
 
 // Initialize the application
 document.addEventListener("DOMContentLoaded", function () {
   loadCocktails();
   setupEventListeners();
+  setupImageUpload();
+
+  // Add this after your existing setupImageUpload function
+
+// Add this function after your existing setupImageUpload function
+function setupCloudinaryWidget() {
+  // Check if Cloudinary is available
+  if (typeof cloudinary === 'undefined') {
+    console.error('Cloudinary widget not loaded');
+    return;
+  }
+
+  // Create upload widget with more features
+  const widget = cloudinary.createUploadWidget(
+    {
+      cloudName: 'dqjhgnivi',
+      uploadPreset: 'cocktail_uploads',
+      sources: [
+        'local',      // File picker
+        'url',        // Upload from URL
+        'camera',     // Camera capture (mobile)
+        'image_search', // Search images (requires API key)
+        'facebook',   // Facebook photos
+        'dropbox',    // Dropbox
+        'google_drive', // Google Drive
+        'instagram'   // Instagram
+      ],
+      multiple: false,
+      resourceType: 'image',
+      clientAllowedFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+      maxFileSize: 10000000, // 10MB
+      folder: 'cocktails',
+      cropping: true,  // Enable cropping
+      croppingAspectRatio: 1.0, // Square crop
+      showAdvancedOptions: true,
+      showInsecurePreview: true,
+      transformation: [
+        { width: 800, height: 600, crop: 'limit' },
+        { quality: 'auto' }
+      ],
+      theme: 'minimal',
+      styles: {
+        palette: {
+          window: "#ffffff",
+          sourceBg: "#f4f4f5",
+          windowBorder: "#90a0b3",
+          tabIcon: "#0078ff",
+          inactiveTabIcon: "#69778a",
+          menuIcons: "#0078ff",
+          link: "#0078ff",
+          action: "#0078ff",
+          inProgress: "#0078ff",
+          complete: "#20b832",
+          error: "#ea2727",
+          textDark: "#000000",
+          textLight: "#ffffff"
+        }
+      }
+    },
+    (error, result) => {
+      if (!error && result && result.event === "success") {
+        console.log('Upload successful:', result.info);
+        uploadedImagePath = result.info.secure_url;
+        
+        // Update preview with more info
+        imagePreview.innerHTML = `
+          <div style="border: 1px solid #ddd; padding: 10px; border-radius: 8px; background: #f9f9f9;">
+            <img src="${result.info.secure_url}" alt="Preview" style="max-width:120px;max-height:80px;border-radius:8px;box-shadow:0 2px 8px #ccc;">
+            <div style="margin-top: 8px;">
+              <div style="color:green;font-size:12px;">✓ Upload successful</div>
+              <div style="color:#666;font-size:11px;">Size: ${Math.round(result.info.bytes / 1024)}KB</div>
+              <div style="color:#666;font-size:11px;">Format: ${result.info.format.toUpperCase()}</div>
+            </div>
+          </div>
+        `;
+      }
+      
+      if (error) {
+        console.error('Upload error:', error);
+        imagePreview.innerHTML = `<div style="color:red;padding:10px;border:1px solid #ff6b6b;border-radius:4px;background:#ffe0e0;">Upload failed: ${error.message || 'Please try again'}</div>`;
+      }
+    }
+  );
+
+  // Add click handler to open widget
+  const uploadButton = document.getElementById("cloudinary-upload-btn");
+  if (uploadButton) {
+    uploadButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      console.log('Opening Cloudinary widget...');
+      widget.open();
+    });
+  } else {
+    console.error('Cloudinary upload button not found');
+  }
+}
+
+// Update your DOMContentLoaded function to include setupCloudinaryWidget
+document.addEventListener("DOMContentLoaded", function () {
+  loadCocktails();
+  setupEventListeners();
+  setupImageUpload();
+  setupCloudinaryWidget(); // Add this line
   // Hide form by default
   document.getElementById("form-section").style.display = "none";
   // Setup image modal events
   setupImageModal();
   // View changer logic
-  const grid = document.getElementById("cocktails-list");
-  const viewBtns = [
-    { id: "view-grid", class: "grid" },
-    { id: "view-masonry", class: "masonry" },
-    { id: "view-oblique", class: "oblique" },
-  ];
-  function setGridView(view) {
-    grid.classList.remove("grid", "masonry", "oblique");
-    grid.classList.add(view);
-    viewBtns.forEach((btn) => {
-      const el = document.getElementById(btn.id);
-      if (btn.class === view) {
-        el.classList.add("active");
-      } else {
-        el.classList.remove("active");
-      }
-    });
-  }
-  viewBtns.forEach((btn) => {
-    const el = document.getElementById(btn.id);
-    if (el) {
-      el.addEventListener("click", function (e) {
-        setGridView(btn.class);
-      });
-    }
-  });
-  // Set default view
-  setGridView("grid");
+  setupViewChanger();
+});
+
+  // Hide form by default
+  document.getElementById("form-section").style.display = "none";
+  // Setup image modal events
+  setupImageModal();
+  // View changer logic
+  setupViewChanger();
 });
 
 function setupImageModal() {
   const modal = document.getElementById("image-modal");
   const modalImg = document.getElementById("image-modal-img");
   const closeBtn = document.getElementById("image-modal-close");
+  
   // Open modal on image click (event delegation)
   document
     .getElementById("cocktails-list")
@@ -76,11 +166,13 @@ function setupImageModal() {
         return;
       }
     });
+  
   // Close modal on close button
   closeBtn.addEventListener("click", function () {
     modal.classList.remove("show");
     modalImg.src = "";
   });
+  
   // Close modal on click outside image
   modal.addEventListener("click", function (e) {
     if (e.target === modal) {
@@ -88,6 +180,7 @@ function setupImageModal() {
       modalImg.src = "";
     }
   });
+  
   // ESC key closes modal
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && modal.classList.contains("show")) {
@@ -95,6 +188,40 @@ function setupImageModal() {
       modalImg.src = "";
     }
   });
+}
+
+function setupViewChanger() {
+  const grid = document.getElementById("cocktails-list");
+  const viewBtns = [
+    { id: "view-grid", class: "grid" },
+    { id: "view-masonry", class: "masonry" },
+    { id: "view-oblique", class: "oblique" },
+  ];
+  
+  function setGridView(view) {
+    grid.classList.remove("grid", "masonry", "oblique");
+    grid.classList.add(view);
+    viewBtns.forEach((btn) => {
+      const el = document.getElementById(btn.id);
+      if (btn.class === view) {
+        el.classList.add("active");
+      } else {
+        el.classList.remove("active");
+      }
+    });
+  }
+  
+  viewBtns.forEach((btn) => {
+    const el = document.getElementById(btn.id);
+    if (el) {
+      el.addEventListener("click", function (e) {
+        setGridView(btn.class);
+      });
+    }
+  });
+  
+  // Set default view
+  setGridView("grid");
 }
 
 // Setup event listeners
@@ -126,6 +253,7 @@ function setupEventListeners() {
       e.preventDefault();
       showForm();
     });
+  
   // Close form button
   document
     .getElementById("close-form-btn")
@@ -133,10 +261,75 @@ function setupEventListeners() {
       e.preventDefault();
       hideForm();
     });
+  
   // Also hide form on cancel
   cancelBtn.addEventListener("click", function () {
     hideForm();
   });
+}
+
+// Setup image upload functionality
+function setupImageUpload() {
+  if (fileInput) {
+    fileInput.addEventListener("change", async function (e) {
+      const file = fileInput.files[0];
+      if (!file) return;
+      
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        imagePreview.innerHTML = '<div style="color:red;">Please select a valid image file (JPEG, PNG, GIF, or WebP)</div>';
+        return;
+      }
+      
+      // Validate file size (10MB Cloudinary limit)
+      if (file.size > 10 * 1024 * 1024) {
+        imagePreview.innerHTML = '<div style="color:red;">File size must be less than 10MB</div>';
+        return;
+      }
+      
+      imagePreview.innerHTML = '<div style="color:blue;">Uploading to Cloudinary...</div>';
+      uploadedImagePath = null;
+      
+      // Show preview
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        imagePreview.innerHTML = `<img src="${ev.target.result}" alt="Preview" style="max-width:120px;max-height:80px;border-radius:8px;box-shadow:0 2px 8px #ccc;">`;
+      };
+      reader.readAsDataURL(file);
+      
+      // Upload to Cloudinary
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", "cocktail_uploads"); // Make sure this preset exists
+      
+      try {
+        const response = await fetch(
+          "https://api.cloudinary.com/v1_1/dqjhgnivi/image/upload",
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+        
+        const data = await response.json();
+        
+        if (response.ok && data.secure_url) {
+          uploadedImagePath = data.secure_url;
+          imagePreview.innerHTML = `
+            <img src="${data.secure_url}" alt="Preview" style="max-width:120px;max-height:80px;border-radius:8px;box-shadow:0 2px 8px #ccc;">
+            <div style="color:green;font-size:12px;">✓ Upload successful</div>
+          `;
+        } else {
+          console.error('Cloudinary error:', data);
+          imagePreview.innerHTML = `<div style='color:red;'>Upload failed: ${data.error?.message || "Please check your Cloudinary settings"}</div>`;
+        }
+      } catch (err) {
+        console.error('Upload error:', err);
+        imagePreview.innerHTML = '<div style="color:red;">Upload failed. Please try again.</div>';
+      }
+    });
+  }
 }
 
 function showForm() {
@@ -166,11 +359,28 @@ async function loadCocktails() {
 
     cocktails = await response.json();
     displayCocktails(cocktails);
+    checkBrokenImages(); // Check for broken images
   } catch (error) {
     console.error("Error loading cocktails:", error);
     showMessage("Error loading cocktails", "error");
   } finally {
     showLoading(false);
+  }
+}
+
+// Check for broken images
+function checkBrokenImages() {
+  const brokenImages = cocktails.filter(cocktail => {
+    return cocktail.theJpeg && 
+           !cocktail.theJpeg.includes('cloudinary.com') && 
+           !cocktail.theJpeg.startsWith('http');
+  });
+  
+  if (brokenImages.length > 0) {
+    console.log(`Found ${brokenImages.length} cocktails with potentially broken images:`);
+    brokenImages.forEach(cocktail => {
+      console.log(`- ${cocktail.theCock}: ${cocktail.theJpeg}`);
+    });
   }
 }
 
@@ -188,9 +398,7 @@ function displayCocktails(cocktailsToShow) {
     .map((cocktail) => {
       const isExpanded = expandedCardId === cocktail._id;
       return `
-        <div class="cocktail-card${isExpanded ? " expanded" : ""}" data-id="${
-        cocktail._id
-      }">
+        <div class="cocktail-card${isExpanded ? " expanded" : ""}" data-id="${cocktail._id}">
             ${
               cocktail.theJpeg
                 ? `<img src="${escapeHtml(cocktail.theJpeg)}" alt="${escapeHtml(
@@ -198,13 +406,9 @@ function displayCocktails(cocktailsToShow) {
                   )}" class="cocktail-image" onerror="this.style.display='none'">`
                 : ""
             }
-            <div class="cocktail-header" onclick="toggleCardExpand(event, '${
-              cocktail._id
-            }')" style="cursor:pointer;">
+            <div class="cocktail-header" onclick="toggleCardExpand(event, '${cocktail._id}')" style="cursor:pointer;">
                 <div>
-                    <h3 class="cocktail-name">${escapeHtml(
-                      cocktail.theCock
-                    )}</h3>
+                    <h3 class="cocktail-name">${escapeHtml(cocktail.theCock)}</h3>
                 </div>
                 <div class="cocktail-actions">
                     ${
@@ -214,9 +418,7 @@ function displayCocktails(cocktailsToShow) {
                     }
                 </div>
             </div>
-            <div class="cocktail-details" style="display:${
-              isExpanded ? "block" : "none"
-            };">
+            <div class="cocktail-details" style="display:${isExpanded ? "block" : "none"};">
                 <div class="cocktail-ingredients">
                     <h4>Ingredients</h4>
                     <p>${escapeHtml(cocktail.theIngredients)}</p>
@@ -227,20 +429,12 @@ function displayCocktails(cocktailsToShow) {
                 </div>
                 ${
                   cocktail.theComment
-                    ? `<div class="cocktail-comment">${escapeHtml(
-                        cocktail.theComment
-                      )}</div>`
+                    ? `<div class="cocktail-comment">${escapeHtml(cocktail.theComment)}</div>`
                     : ""
                 }
                 <div class="cocktail-edit-delete">
-                    <button class="btn btn-edit" onclick="editCocktail('${
-                      cocktail._id
-                    }');event.stopPropagation();"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-delete" onclick="deleteCocktail('${
-                      cocktail._id
-                    }', '${escapeHtml(
-        cocktail.theCock
-      )}');event.stopPropagation();"><i class="fas fa-trash"></i> Delete</button>
+                    <button class="btn btn-edit" onclick="editCocktail('${cocktail._id}');event.stopPropagation();"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-delete" onclick="deleteCocktail('${cocktail._id}', '${escapeHtml(cocktail.theCock)}');event.stopPropagation();"><i class="fas fa-trash"></i> Delete</button>
                 </div>
             </div>
         </div>
@@ -268,88 +462,6 @@ window.collapseCard = function (event, id) {
   displayCocktails(cocktails);
   event.stopPropagation();
 };
-// ...existing code...
-
-// Image upload logic - Updated for Cloudinary
-const fileInput = document.getElementById("theJpegFile");
-const imageUrlInput = document.getElementById("theJpeg");
-const imagePreview = document.getElementById("image-upload-preview");
-let uploadedImagePath = null;
-
-if (fileInput) {
-  fileInput.addEventListener("change", async function (e) {
-    const file = fileInput.files[0];
-    if (!file) return;
-    
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      imagePreview.innerHTML = '<div style="color:red;">Please select a valid image file (JPEG, PNG, GIF, or WebP)</div>';
-      return;
-    }
-    
-    // Validate file size (10MB Cloudinary limit)
-    if (file.size > 10 * 1024 * 1024) {
-      imagePreview.innerHTML = '<div style="color:red;">File size must be less than 10MB</div>';
-      return;
-    }
-    
-    imagePreview.innerHTML = '<div style="color:blue;">Uploading to Cloudinary...</div>';
-    uploadedImagePath = null;
-    
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = function (ev) {
-      imagePreview.innerHTML = `<img src="${ev.target.result}" alt="Preview" style="max-width:120px;max-height:80px;border-radius:8px;box-shadow:0 2px 8px #ccc;">`;
-    };
-    reader.readAsDataURL(file);
-    
-    // Upload to Cloudinary
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", "cocktail"); // Replace with your preset
-    formData.append("cloud_name", "dqjhgnivi"); // Replace with your cloud name
-    
-    try {
-      const response = await fetch(
-        "https://api.cloudinary.com/v1_1/dqjhgnivi/image/upload", // Replace with your cloud name
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-      
-      const data = await response.json();
-      
-      if (response.ok && data.secure_url) {
-        uploadedImagePath = data.secure_url;
-        imagePreview.innerHTML += '<div style="color:green;font-size:12px;">✓ Upload successful</div>';
-      } else {
-        imagePreview.innerHTML = `<div style='color:red;'>Upload failed: ${data.error?.message || "Unknown error"}</div>`;
-      }
-    } catch (err) {
-      console.error('Upload error:', err);
-      imagePreview.innerHTML = '<div style="color:red;">Upload failed. Please try again.</div>';
-    }
-  });
-}
-
-// Updated form reset to clear image preview
-function resetForm() {
-  cocktailForm.reset();
-  editingId = null;
-  uploadedImagePath = null;
-  formTitle.textContent = "Add New Cocktail";
-  cancelBtn.style.display = "none";
-  document.getElementById("cocktail-id").value = "";
-  
-  // Clear image preview
-  if (imagePreview) {
-    imagePreview.innerHTML = "";
-  }
-}
-
-// ...existing code...
 
 // Handle form submission
 async function handleFormSubmit(e) {
@@ -437,6 +549,26 @@ function editCocktail(id) {
   document.getElementById("theRecipe").value = cocktail.theRecipe;
   document.getElementById("theJpeg").value = cocktail.theJpeg || "";
   document.getElementById("theComment").value = cocktail.theComment || "";
+// this is prob ok
+  // Show existing image in preview if it exists
+  if (cocktail.theJpeg) {
+    // Check if it's a Cloudinary URL
+    if (cocktail.theJpeg.includes('cloudinary.com')) {
+      imagePreview.innerHTML = `
+        <img src="${cocktail.theJpeg}" alt="Current image" style="max-width:120px;max-height:80px;border-radius:8px;box-shadow:0 2px 8px #ccc;">
+        <div style="color:green;font-size:12px;">Current image</div>
+      `;
+      uploadedImagePath = cocktail.theJpeg;
+    } else {
+      // It's a local/broken image
+      imagePreview.innerHTML = `
+        <div style="color:orange;font-size:12px;">⚠️ Current image may not be working. Please upload a new one.</div>
+      `;
+    }
+  } else {
+    imagePreview.innerHTML = "";
+  }
+// stop here
 
   // Show the form section (modal)
   const formSection = document.getElementById("form-section");
@@ -458,9 +590,20 @@ function cancelEdit() {
 function resetForm() {
   cocktailForm.reset();
   editingId = null;
+  uploadedImagePath = null;
   formTitle.textContent = "Add New Cocktail";
   cancelBtn.style.display = "none";
   document.getElementById("cocktail-id").value = "";
+  
+  // Clear image preview
+  if (imagePreview) {
+    imagePreview.innerHTML = "";
+  }
+  
+  // Clear file input
+  if (fileInput) {
+    fileInput.value = "";
+  }
 }
 
 // Delete cocktail
@@ -557,3 +700,19 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+// Add this temporarily to test the button
+document.addEventListener("DOMContentLoaded", function () {
+  // ... your existing code ...
+  
+  // Test button click
+  const testButton = document.getElementById("cloudinary-upload-btn");
+  if (testButton) {
+    testButton.addEventListener("click", function() {
+      console.log('Button clicked!');
+      alert('Button works!');
+    });
+  } else {
+    console.error('Button not found!');
+  }
+});
